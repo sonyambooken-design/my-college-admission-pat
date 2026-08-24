@@ -50,3 +50,6 @@ Open http://localhost:3000
 ## Data sources
 
 Institution metrics are requested from the U.S. Department of Education College Scorecard API. Location lookup uses OpenStreetMap Nominatim to resolve a user-entered U.S. location to a ZIP/coordinate center. For a high-volume commercial launch, replace Nominatim with a production geocoding provider or an appropriately provisioned service.
+
+## Student Discovery / Major & Career Recommender
+The **Discover My Major** tab now collects 25+ signals across interests/work style, AP/IB/Honors courses, clubs, leadership roles, sports, community service, work/internships/projects, education tolerance, and career priorities. It returns Top 5 majors, Top 5 career paths, explainable fit reasons, backup-career strength, and suggested courses/activities to explore next.

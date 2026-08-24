@@ -2,20 +2,14 @@
 
 import { useMemo, useState } from "react";
 import type { HomeLocation, RecommendedCollege } from "@/lib/types";
+import { defaultDiscoveryProfile, recommendMajors, recommendCareers, nextStepsForMajor, AP_OPTIONS, ACTIVITY_OPTIONS, LEADERSHIP_OPTIONS, SPORTS_OPTIONS, SERVICE_OPTIONS, WORK_OPTIONS, PRIORITY_OPTIONS, type DiscoveryProfile, type RatingKey } from "@/lib/majorDiscovery";
 
-type Tab = "Discover" | "Majors" | "Medical Pathways" | "Advisor" | "My List";
+type Tab = "Discover" | "Discover My Major" | "Medical Pathways" | "Advisor" | "My List";
 
 const money = (n?: number | null) => n == null ? "—" : `$${Math.round(n).toLocaleString()}`;
 const pct = (n?: number | null) => n == null ? "—" : `${Math.round(n * 100)}%`;
 const number = (n?: number | null) => n == null ? "—" : Math.round(n).toLocaleString();
 const badgeClass = (category: string) => `badge badge-${category.toLowerCase().replaceAll(" ", "-")}`;
-
-const majorMatches = [
-  { major: "Biomedical Engineering", score: 92, premed: "Strong", backup: "Excellent", why: "Healthcare + quantitative problem-solving + engineering career flexibility." },
-  { major: "Neuroscience", score: 89, premed: "Excellent", backup: "Moderate", why: "Strong fit for biology, research, behavior and medicine." },
-  { major: "Data Science", score: 84, premed: "Possible", backup: "Excellent", why: "Strong employability and analytical fit; medical prerequisites must be planned separately." },
-  { major: "Biochemistry", score: 82, premed: "Excellent", backup: "Moderate", why: "Direct alignment with chemistry, biology and many medical-school prerequisites." }
-];
 
 const medicalPrograms = [
   { program: "Special Program in Medicine", school: "University of Connecticut", type: "BS/MD", status: "Verify current cycle" },
@@ -42,6 +36,10 @@ export default function Home() {
   const [question, setQuestion] = useState("Which of these colleges gives me strong pre-med options with a practical backup major?");
   const [answer, setAnswer] = useState("");
   const [asking, setAsking] = useState(false);
+  const [discovery, setDiscovery] = useState<DiscoveryProfile>(defaultDiscoveryProfile);
+  const [majorResults, setMajorResults] = useState<ReturnType<typeof recommendMajors>>([]);
+  const [careerResults, setCareerResults] = useState<ReturnType<typeof recommendCareers>>([]);
+  const [discoveryComplete, setDiscoveryComplete] = useState(false);
 
   const counts = useMemo(() => ({
     likely: colleges.filter(c => c.category === "Likely").length,
@@ -118,15 +116,31 @@ export default function Home() {
     setSaved(prev => prev.includes(name) ? prev.filter(x => x !== name) : [...prev, name]);
   }
 
+  function rate(key: RatingKey, value: number) { setDiscovery(prev => ({...prev, [key]: value})); }
+  function toggleArray(key: keyof Pick<DiscoveryProfile, "apCourses"|"activities"|"leadershipRoles"|"sports"|"service"|"work"|"priorities">, value: string) {
+    setDiscovery(prev => { const arr=prev[key] as string[]; return {...prev, [key]: arr.includes(value) ? arr.filter(x=>x!==value) : [...arr,value]}; });
+  }
+  function runMajorDiscovery() {
+    setMajorResults(recommendMajors(discovery).slice(0,5));
+    setCareerResults(recommendCareers(discovery));
+    setDiscoveryComplete(true);
+    setTab("Discover My Major");
+    setTimeout(()=>document.getElementById("major-results")?.scrollIntoView({behavior:"smooth",block:"start"}),50);
+  }
+
+  const ratingQuestions: {key:RatingKey;label:string}[] = [
+    {key:"biology",label:"I enjoy biology and life sciences."},{key:"chemistry",label:"I enjoy chemistry and laboratory science."},{key:"math",label:"I enjoy math and quantitative problem solving."},{key:"coding",label:"I enjoy coding, computers and technology."},{key:"business",label:"I am interested in business, markets or entrepreneurship."},{key:"writing",label:"I enjoy writing, reading and communication."},{key:"design",label:"I enjoy design and visual/spatial thinking."},{key:"healthcare",label:"I am strongly interested in healthcare or medicine."},{key:"research",label:"I enjoy research, experiments and discovering new knowledge."},{key:"helping",label:"I want my work to directly help people."},{key:"leadership",label:"I enjoy leading groups and organizing projects."},{key:"persuasion",label:"I enjoy persuading, negotiating or selling ideas."},{key:"data",label:"I enjoy analyzing data, trends and evidence."},{key:"building",label:"I like building, fixing or creating things."},{key:"creativity",label:"I enjoy creative, open-ended problems."},{key:"publicSpeaking",label:"I am comfortable speaking in front of groups."},{key:"teamwork",label:"I enjoy working as part of a team."},{key:"independence",label:"I enjoy working independently on difficult problems."}
+  ];
+
   return <main>
     <header className="topbar">
       <div className="brand"><div className="mark">MP</div><div><strong>My College Admission Path</strong><span>Find fit. Build your path.</span></div></div>
-      <nav>{(["Discover", "Majors", "Medical Pathways", "Advisor", "My List"] as Tab[]).map(x => <button key={x} className={tab === x ? "active" : ""} onClick={() => setTab(x)}>{x}</button>)}</nav>
+      <nav>{(["Discover", "Discover My Major", "Medical Pathways", "Advisor", "My List"] as Tab[]).map(x => <button key={x} className={tab === x ? "active" : ""} onClick={() => setTab(x)}>{x}</button>)}</nav>
       <div className="creator">S.A.</div>
     </header>
 
     <section className="hero">
-      <div className="hero-copy"><span className="eyebrow">PERSONALIZED COLLEGE PLANNING</span><h1>Find colleges that fit your numbers—and your path.</h1><p>Use your home location, SAT, GPA, budget, career direction and preferred radius to create a ranked college list.</p><div className="trust"><span>✓ Live federal college data</span><span>✓ Transparent heuristic fit score</span><span>✓ No admission guarantees</span></div></div>
+      <div className="hero-copy"><span className="eyebrow">PERSONALIZED COLLEGE PLANNING</span><h1>Find colleges that fit your numbers—and your path.</h1><p>Use your home location, SAT, GPA, budget, career direction and preferred radius to create a ranked college list—or take the student discovery questionnaire to explore majors and careers.</p><div className="trust"><span>✓ Live federal college data</span><span>✓ Transparent heuristic fit score</span><span>✓ No admission guarantees</span></div></div>
       <div className="profile-card">
         <div className="card-title"><b>Student profile</b><span>Recommendation inputs</span></div>
         <label>Home location <div className="location-line"><input value={locationText} onChange={e => { setLocationText(e.target.value); setHome(null); }} placeholder="ZIP or city, state"/><button type="button" onClick={() => resolveLocation()} disabled={locationLoading}>{locationLoading ? "…" : "Set"}</button></div></label>
@@ -150,7 +164,22 @@ export default function Home() {
         </>}
       </>}
 
-      {tab === "Majors" && <><div className="section-head"><div><span className="kicker">MAJOR FINDER</span><h2>Choose a major that fits both interests and future options.</h2><p>Pre-med is a pathway, not a required major. These examples show how the major recommender can balance medical-school preparation with backup-career resilience.</p></div></div><div className="major-grid">{majorMatches.map((m,i) => <article key={m.major}><div className="number">0{i+1}</div><div><h3>{m.major}</h3><p>{m.why}</p><span>Pre-med: {m.premed}</span><span>Backup career: {m.backup}</span></div><b>{m.score}</b></article>)}</div></>}
+      {tab === "Discover My Major" && <>
+        <div className="section-head"><div><span className="kicker">STUDENT DISCOVERY</span><h2>Discover My Major & Career Path</h2><p>Tell us what you enjoy, what you have actually done, and what matters for your future. The recommendation engine uses interests together with AP/Honors courses, clubs, leadership, sports, service and work experience.</p></div></div>
+        <div className="discovery-shell">
+          <section className="question-card"><h3>1. Interests & work style</h3><p className="muted">Rate each statement from 1 (not like me) to 5 (very much like me).</p><div className="rating-list">{ratingQuestions.map(q=><div className="rating-row" key={q.key}><span>{q.label}</span><div className="rating-buttons">{[1,2,3,4,5].map(v=><button key={v} className={discovery[q.key]===v?"chosen":""} onClick={()=>rate(q.key,v)}>{v}</button>)}</div></div>)}</div></section>
+          <section className="question-card"><h3>2. Academic evidence</h3><p className="muted">Select AP, IB or advanced courses taken or planned.</p><div className="choice-grid">{AP_OPTIONS.map(x=><button key={x} onClick={()=>toggleArray("apCourses",x)} className={discovery.apCourses.includes(x)?"choice on":"choice"}>{x}</button>)}</div></section>
+          <section className="question-card"><h3>3. Clubs & extracurriculars</h3><div className="choice-grid">{ACTIVITY_OPTIONS.map(x=><button key={x} onClick={()=>toggleArray("activities",x)} className={discovery.activities.includes(x)?"choice on":"choice"}>{x}</button>)}</div></section>
+          <section className="question-card"><h3>4. Leadership roles</h3><p className="muted">Leadership is most useful when it reflects real responsibility—not merely a title.</p><div className="choice-grid">{LEADERSHIP_OPTIONS.map(x=><button key={x} onClick={()=>toggleArray("leadershipRoles",x)} className={discovery.leadershipRoles.includes(x)?"choice on":"choice"}>{x}</button>)}</div></section>
+          <section className="question-card"><h3>5. Sports</h3><div className="choice-grid">{SPORTS_OPTIONS.map(x=><button key={x} onClick={()=>toggleArray("sports",x)} className={discovery.sports.includes(x)?"choice on":"choice"}>{x}</button>)}</div></section>
+          <section className="question-card"><h3>6. Community service</h3><div className="choice-grid">{SERVICE_OPTIONS.map(x=><button key={x} onClick={()=>toggleArray("service",x)} className={discovery.service.includes(x)?"choice on":"choice"}>{x}</button>)}</div></section>
+          <section className="question-card"><h3>7. Work, internships & projects</h3><div className="choice-grid">{WORK_OPTIONS.map(x=><button key={x} onClick={()=>toggleArray("work",x)} className={discovery.work.includes(x)?"choice on":"choice"}>{x}</button>)}</div></section>
+          <section className="question-card"><h3>8. Career priorities</h3><div className="choice-grid">{PRIORITY_OPTIONS.map(x=><button key={x} onClick={()=>toggleArray("priorities",x)} className={discovery.priorities.includes(x)?"choice on":"choice"}>{x}</button>)}</div><label className="education-label">How much education are you open to?<select value={discovery.educationYears} onChange={e=>setDiscovery(prev=>({...prev,educationYears:e.target.value as DiscoveryProfile["educationYears"]}))}><option value="4">About 4 years</option><option value="6">Up to 6 years</option><option value="8+">8+ years / professional school</option><option value="unsure">Not sure yet</option></select></label></section>
+          <button className="primary discovery-submit" onClick={runMajorDiscovery}>Recommend My Majors & Careers →</button>
+        </div>
+        {discoveryComplete && <div id="major-results" className="discovery-results"><div className="section-head"><div><span className="kicker">YOUR RESULTS</span><h2>Top 5 majors to explore</h2><p>These are exploration recommendations, not a declaration of aptitude or a requirement to choose one now.</p></div></div><div className="major-grid">{majorResults.map((m,i)=>{const next=nextStepsForMajor(m.major);return <article key={m.major} className="major-result-card"><div className="number">0{i+1}</div><div><h3>{m.major}</h3><p>{m.why}</p><div className="result-tags"><span>Backup career: {m.backup}</span><span>Education: {m.education}</span></div><details><summary>Courses & activities to explore next</summary><b>Courses:</b> {next.courses.join(", ") || "Explore relevant advanced coursework"}<br/><b>Activities:</b> {next.activities.join(", ") || "Explore a related club, project or internship"}</details></div><b className="big-score">{m.score}</b></article>})}</div><div className="career-panel"><h2>Top 5 career paths to investigate</h2><div className="career-grid">{careerResults.map((c,i)=><article key={c.career}><span>0{i+1}</span><div><h3>{c.career}</h3><p>Strongly connected to your {c.source} profile match. Use this as a prompt for job shadowing, research and informational interviews.</p></div><b>{c.score}</b></article>)}</div></div><div className="discovery-caution"><b>How to use these results:</b> Look for patterns, not a single “correct” answer. Course rigor, grades, actual experiences, values and evolving interests should all influence the final major choice. For pre-med students, medical-school prerequisites are separate from the undergraduate major.</div></div>}
+      </>}
+
 
       {tab === "Medical Pathways" && <><div className="section-head"><div><span className="kicker">MEDICAL PATHWAYS</span><h2>Traditional pre-med, BS/MD, BS/DO and early assurance.</h2><p>Combined medical programs change frequently. This section intentionally labels program information for current-cycle verification.</p></div></div><div className="path-table">{medicalPrograms.map(p => <div key={p.program}><b>{p.program}</b><span>{p.school}</span><span>{p.type}</span><em>{p.status}</em></div>)}</div></>}
 
